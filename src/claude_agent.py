@@ -78,6 +78,8 @@ class ClaudeScheduler:
                 if scenarios:
                     return scenarios
                 else:
+                    print("⚠️ Claude response text:")
+                    print(response_text[:1000])  # First 1000 chars for debugging
                     raise ValueError("No scenarios returned from Claude")
 
             except Exception as e:
@@ -204,40 +206,57 @@ class ScenarioDisplay:
             Formatted text summary
         """
         lines = []
-        lines.append(f"## {scenario['name']}")
-        lines.append(f"*{scenario['description']}*\n")
+        lines.append(f"## {scenario.get('name', '시나리오')}")
+        lines.append(f"*{scenario.get('description', '')}*\n")
 
         # Team summaries
-        for team_id, assignments in scenario.get("teams", {}).items():
+        teams = scenario.get("teams", {})
+        if not teams:
+            lines.append("⚠️ 팀 정보가 없습니다.")
+            return "\n".join(lines)
+
+        for team_id, assignments in teams.items():
             lines.append(f"### 🎯 팀 {team_id}")
 
+            if not assignments:
+                lines.append("   - 배정된 일정 없음\n")
+                continue
+
             for i, assignment in enumerate(assignments, 1):
-                time_str = f"{assignment['start_time']}-{assignment['end_time']}"
-                members_str = ", ".join(assignment["members"])
+                # Safely get values with defaults
+                start_time = assignment.get("start_time", "시간 미정")
+                end_time = assignment.get("end_time", "시간 미정")
+                room_name = assignment.get("room_name", "방 이름 없음")
+                theme = assignment.get("theme", "테마 없음")
+                members = assignment.get("members", [])
+                member_count = assignment.get("member_count", len(members))
+
+                time_str = f"{start_time}-{end_time}"
+                members_str = ", ".join(members) if members else "참여자 없음"
 
                 # Theme emoji
-                theme_emoji = "🔪" if "공포" in assignment['theme'] else "🧩"
+                theme_emoji = "🔪" if "공포" in theme else "🧩"
 
                 lines.append(
-                    f"**{i}. {time_str}** {theme_emoji} **{assignment['room_name']}** ({assignment['theme']})"
+                    f"**{i}. {time_str}** {theme_emoji} **{room_name}** ({theme})"
                 )
-                lines.append(f"   - 👥 참여자 ({assignment['member_count']}명): {members_str}")
+                lines.append(f"   - 👥 참여자 ({member_count}명): {members_str}")
 
-                if assignment.get("travel_time_from_previous", 0) > 0:
-                    lines.append(
-                        f"   - 🚗 이동 시간: {assignment['travel_time_from_previous']}분"
-                    )
+                travel_time = assignment.get("travel_time_from_previous", 0)
+                if travel_time > 0:
+                    lines.append(f"   - 🚗 이동 시간: {travel_time}분")
 
-                if assignment.get("notes"):
-                    lines.append(f"   - 📝 {assignment['notes']}")
+                notes = assignment.get("notes", "")
+                if notes:
+                    lines.append(f"   - 📝 {notes}")
 
                 lines.append("")
 
         # Pros and cons
         lines.append("---")
         lines.append("### ✅ 장점")
-        lines.append(scenario.get("pros", "없음"))
+        lines.append(scenario.get("pros", "정보 없음"))
         lines.append("\n### ⚠️ 단점")
-        lines.append(scenario.get("cons", "없음"))
+        lines.append(scenario.get("cons", "정보 없음"))
 
         return "\n".join(lines)
