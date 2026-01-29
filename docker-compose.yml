@@ -8,9 +8,11 @@ services:
       - ./data:/app/data
       - ./src:/app/src
       - ./.env:/app/.env
+      - ${GOOGLE_SHEETS_CREDENTIALS_PATH}:/app/credentials.json
     environment:
       - PYTHONUNBUFFERED=1
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - NAVER_MAPS_CLIENT_ID=${NAVER_MAPS_CLIENT_ID}
       - NAVER_MAPS_CLIENT_SECRET=${NAVER_MAPS_CLIENT_SECRET}
+      - GOOGLE_SHEETS_CREDENTIALS_PATH=/app/credentials.json
     restart: unless-stopped

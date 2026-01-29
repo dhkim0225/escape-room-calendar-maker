@@ -44,9 +44,9 @@ class Config:
         if not cls.NAVER_MAPS_CLIENT_SECRET:
             missing.append("NAVER_MAPS_CLIENT_SECRET")
 
-        # Google Sheets is optional - don't block if not configured
-        # if not Path(cls.GOOGLE_SHEETS_CREDENTIALS_PATH).exists():
-        #     missing.append(f"Google Sheets credentials file at {cls.GOOGLE_SHEETS_CREDENTIALS_PATH}")
+        # Google Sheets - check if file exists
+        if not Path(cls.GOOGLE_SHEETS_CREDENTIALS_PATH).exists():
+            missing.append(f"GOOGLE_SHEETS_CREDENTIALS_PATH (file not found: {cls.GOOGLE_SHEETS_CREDENTIALS_PATH})")
 
         return missing
 
