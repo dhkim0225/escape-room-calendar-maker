@@ -32,9 +32,12 @@ def main():
         missing_config = Config.validate()
         if missing_config:
             st.error("❌ API 키가 설정되지 않았습니다")
-            st.markdown("다음 항목을 `~/.zshrc`에 설정해주세요:")
+            st.markdown("다음 항목을 환경 변수로 설정해주세요:")
             for item in missing_config:
-                st.code(item, language=None)
+                st.code(f"export {item}=...", language="bash")
+            st.info(
+                "💡 Shell 설정 파일 (예: ~/.bashrc, ~/.zshrc)에 추가 후 `source` 명령으로 적용"
+            )
             st.stop()
         else:
             st.success("✅ API 키 설정 완료")

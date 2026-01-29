@@ -15,7 +15,12 @@
 
 ### 1. 환경 설정
 
-**API 키를 `~/.zshrc`에 설정하세요:**
+**API 키를 환경 변수로 설정하세요:**
+
+Shell 설정 파일에 추가:
+- Bash: `~/.bashrc` 또는 `~/.bash_profile`
+- Zsh: `~/.zshrc`
+- Fish: `~/.config/fish/config.fish` (export 대신 `set -x` 사용)
 
 ```bash
 # Claude API (Anthropic)
@@ -28,7 +33,11 @@ export NAVER_MAPS_CLIENT_SECRET="your-client-secret-here"
 
 환경 변수 적용:
 ```bash
-source ~/.zshrc
+# Bash/Zsh
+source ~/.bashrc  # 또는 ~/.zshrc
+
+# Fish
+source ~/.config/fish/config.fish
 ```
 
 ### 2. Google Sheets 인증 설정 (선택사항)
