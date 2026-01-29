@@ -100,55 +100,118 @@ def main():
     # Parse uploaded files
     if reservations_file and users_file:
         try:
+            import pandas as pd
+
             with st.spinner("📊 데이터 파싱 중..."):
+                # Parse to validate format
                 reservations = parse_reservations(reservations_file)
                 users = parse_users(users_file)
 
             st.success(f"✅ 예약 {len(reservations)}건, 참여자 {len(users)}명 확인")
 
-            # Display parsed data
-            st.header("📊 2. 데이터 확인")
+            # Display and edit data
+            st.header("📊 2. 데이터 확인 및 편집")
+            st.info("💡 표를 직접 클릭해서 수정할 수 있습니다. 행 추가/삭제도 가능합니다.")
 
             tab1, tab2 = st.tabs(["예약 정보", "참여자 정보"])
 
             with tab1:
-                st.dataframe(
-                    [
-                        {
-                            "방이름": r.room_name,
-                            "시작시간": r.start_time.strftime("%m/%d %H:%M"),
-                            "종료시간": r.end_time.strftime("%m/%d %H:%M"),
-                            "주소": r.address,
-                            "테마": r.theme,
-                            "인원": f"{r.min_capacity}-{r.optimal_capacity}-{r.max_capacity}명"
-                        }
-                        for r in reservations
-                    ],
-                    use_container_width=True
+                # Create editable DataFrame for reservations
+                reservations_df = pd.DataFrame([
+                    {
+                        "방이름": r.room_name,
+                        "시작시간": r.start_time.strftime("%Y-%m-%d %H:%M"),
+                        "종료시간": r.end_time.strftime("%Y-%m-%d %H:%M"),
+                        "주소": r.address,
+                        "테마": r.theme,
+                        "최소인원": r.min_capacity,
+                        "적정인원": r.optimal_capacity,
+                        "최대인원": r.max_capacity
+                    }
+                    for r in reservations
+                ])
+
+                edited_reservations_df = st.data_editor(
+                    reservations_df,
+                    num_rows="dynamic",  # Allow adding/removing rows
+                    use_container_width=True,
+                    key="reservations_editor",
+                    column_config={
+                        "방이름": st.column_config.TextColumn("방이름", required=True),
+                        "시작시간": st.column_config.TextColumn("시작시간 (YYYY-MM-DD HH:MM)", required=True),
+                        "종료시간": st.column_config.TextColumn("종료시간 (YYYY-MM-DD HH:MM)", required=True),
+                        "주소": st.column_config.TextColumn("주소", required=True),
+                        "테마": st.column_config.TextColumn("테마", required=True),
+                        "최소인원": st.column_config.NumberColumn("최소인원", min_value=1, max_value=20, required=True),
+                        "적정인원": st.column_config.NumberColumn("적정인원", min_value=1, max_value=20, required=True),
+                        "최대인원": st.column_config.NumberColumn("최대인원", min_value=1, max_value=20, required=True),
+                    }
                 )
 
+                # Store edited data in session state
+                st.session_state.edited_reservations_df = edited_reservations_df
+
             with tab2:
-                st.dataframe(
-                    [
-                        {
-                            "이름": u.name,
-                            "참여시작": u.available_from.strftime("%m/%d %H:%M"),
-                            "참여종료": u.available_until.strftime("%m/%d %H:%M"),
-                            "공포포지션": u.horror_position
-                        }
-                        for u in users
-                    ],
-                    use_container_width=True
+                # Create editable DataFrame for users
+                users_df = pd.DataFrame([
+                    {
+                        "이름": u.name,
+                        "참여시작시간": u.available_from.strftime("%Y-%m-%d %H:%M"),
+                        "참여종료시간": u.available_until.strftime("%Y-%m-%d %H:%M"),
+                        "공포포지션": u.horror_position
+                    }
+                    for u in users
+                ])
+
+                edited_users_df = st.data_editor(
+                    users_df,
+                    num_rows="dynamic",  # Allow adding/removing rows
+                    use_container_width=True,
+                    key="users_editor",
+                    column_config={
+                        "이름": st.column_config.TextColumn("이름", required=True),
+                        "참여시작시간": st.column_config.TextColumn("참여시작시간 (YYYY-MM-DD HH:MM)", required=True),
+                        "참여종료시간": st.column_config.TextColumn("참여종료시간 (YYYY-MM-DD HH:MM)", required=True),
+                        "공포포지션": st.column_config.SelectboxColumn(
+                            "공포포지션",
+                            options=["탱커", "평민", "쫄"],
+                            required=True
+                        ),
+                    }
                 )
+
+                # Store edited data in session state
+                st.session_state.edited_users_df = edited_users_df
 
             # Generate schedule button
             st.header("🤖 3. 일정 생성")
 
             if st.button("🚀 일정 생성하기", type="primary", use_container_width=True):
-                # Store data in session state for generation
-                st.session_state.parsed_reservations_data = reservations
-                st.session_state.parsed_users_data = users
-                st.session_state.should_generate_schedule = True
+                # Parse edited data from DataFrames
+                try:
+                    from io import StringIO
+
+                    # Convert edited DataFrames back to CSV format for parsing
+                    reservations_csv = StringIO()
+                    edited_reservations_df.to_csv(reservations_csv, index=False)
+                    reservations_csv.seek(0)
+
+                    users_csv = StringIO()
+                    edited_users_df.to_csv(users_csv, index=False)
+                    users_csv.seek(0)
+
+                    # Parse edited data
+                    edited_reservations = parse_reservations(reservations_csv)
+                    edited_users = parse_users(users_csv)
+
+                    # Store data in session state for generation
+                    st.session_state.parsed_reservations_data = edited_reservations
+                    st.session_state.parsed_users_data = edited_users
+                    st.session_state.should_generate_schedule = True
+
+                except Exception as e:
+                    st.error(f"❌ 편집된 데이터 파싱 오류: {str(e)}")
+                    st.info("💡 데이터 형식을 확인해주세요. 시간 형식: YYYY-MM-DD HH:MM")
 
         except ValueError as e:
             st.error(f"❌ 데이터 파싱 오류: {str(e)}")
