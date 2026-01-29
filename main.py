@@ -306,35 +306,72 @@ def main():
                             )
                             st.markdown(scenario_text)
 
-                            # Export button
-                            sheets_available = Config.is_google_sheets_configured()
+                            # Export buttons
+                            col1, col2 = st.columns(2)
 
-                            if st.button(
-                                "📊 Google Sheets로 내보내기",
-                                key=f"export_{scenario.get('scenario_id')}",
-                                disabled=not sheets_available,
-                                help="Google Sheets로 일정표 내보내기"
-                                if sheets_available
-                                else "Google Sheets API를 먼저 설정해주세요 (사이드바 참고)",
-                            ):
-                                with st.spinner("📊 Google Sheets 생성 중..."):
-                                    try:
-                                        exporter = GoogleSheetsExporter()
-                                        sheet_url = exporter.create_schedule_sheet(
-                                            scenario
-                                        )
+                            with col1:
+                                sheets_available = Config.is_google_sheets_configured()
 
-                                        if sheet_url:
-                                            st.success("✅ Google Sheets 생성 완료!")
-                                            st.markdown(
-                                                f"[📊 시트 열기]({sheet_url})",
-                                                unsafe_allow_html=True,
+                                if st.button(
+                                    "📊 Google Sheets로 내보내기",
+                                    key=f"export_sheets_{scenario.get('scenario_id')}",
+                                    disabled=not sheets_available,
+                                    help="Google Sheets로 일정표 내보내기"
+                                    if sheets_available
+                                    else "Google Sheets API를 먼저 설정해주세요 (사이드바 참고)",
+                                    use_container_width=True,
+                                ):
+                                    with st.spinner("📊 Google Sheets 생성 중..."):
+                                        try:
+                                            exporter = GoogleSheetsExporter()
+                                            sheet_url = exporter.create_schedule_sheet(
+                                                scenario
                                             )
-                                        else:
-                                            st.error("시트 생성에 실패했습니다")
 
-                                    except Exception as e:
-                                        st.error(f"Google Sheets 내보내기 오류: {str(e)}")
+                                            if sheet_url:
+                                                st.success("✅ Google Sheets 생성 완료!")
+                                                st.markdown(
+                                                    f"[📊 시트 열기]({sheet_url})",
+                                                    unsafe_allow_html=True,
+                                                )
+                                            else:
+                                                st.error("시트 생성에 실패했습니다")
+
+                                        except Exception as e:
+                                            st.error(f"{str(e)}")
+
+                            with col2:
+                                # CSV download button
+                                import pandas as pd
+
+                                # Convert scenario to CSV format
+                                rows = []
+                                for team_id, assignments in scenario.get("teams", {}).items():
+                                    for assignment in assignments:
+                                        rows.append({
+                                            "팀": f"팀 {team_id}",
+                                            "시작시간": assignment.get("start_time", ""),
+                                            "종료시간": assignment.get("end_time", ""),
+                                            "방이름": assignment.get("room_name", ""),
+                                            "테마": assignment.get("theme", ""),
+                                            "참여자": ", ".join(assignment.get("members", [])),
+                                            "인원": assignment.get("member_count", 0),
+                                            "이동시간(분)": assignment.get("travel_time_from_previous", 0),
+                                            "메모": assignment.get("notes", "")
+                                        })
+
+                                if rows:
+                                    csv_df = pd.DataFrame(rows)
+                                    csv_data = csv_df.to_csv(index=False, encoding="utf-8-sig")
+
+                                    st.download_button(
+                                        label="📥 CSV 다운로드",
+                                        data=csv_data,
+                                        file_name=f"escape_room_schedule_{scenario.get('scenario_id', 1)}.csv",
+                                        mime="text/csv",
+                                        key=f"export_csv_{scenario.get('scenario_id')}",
+                                        use_container_width=True,
+                                    )
                 else:
                     st.warning("시나리오 생성에 실패했습니다")
 

@@ -74,8 +74,16 @@ class GoogleSheetsExporter:
             return spreadsheet.url
 
         except Exception as e:
-            print(f"Failed to create Google Sheet: {str(e)}")
-            return None
+            error_msg = str(e)
+            print(f"Failed to create Google Sheet: {error_msg}")
+
+            # Check for specific errors
+            if "storageQuotaExceeded" in error_msg or "storage quota" in error_msg.lower():
+                raise ValueError("❌ Google Drive 저장 용량이 초과되었습니다. Drive에서 파일을 삭제하거나 용량을 늘려주세요.")
+            elif "403" in error_msg:
+                raise ValueError("❌ Google Sheets 권한이 없습니다. Service Account에 Editor 권한이 있는지 확인해주세요.")
+            else:
+                raise ValueError(f"❌ Google Sheets 생성 실패: {error_msg}")
 
     def _format_timeline(self, scenario: Dict[str, Any]) -> List[List[str]]:
         """
