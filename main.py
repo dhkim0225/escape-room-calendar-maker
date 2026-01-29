@@ -146,9 +146,9 @@ def main():
 
             if st.button("🚀 일정 생성하기", type="primary", use_container_width=True):
                 # Store data in session state for generation
-                st.session_state.reservations = reservations
-                st.session_state.users = users
-                st.session_state.generate_schedule = True
+                st.session_state.parsed_reservations_data = reservations
+                st.session_state.parsed_users_data = users
+                st.session_state.should_generate_schedule = True
 
         except ValueError as e:
             st.error(f"❌ 데이터 파싱 오류: {str(e)}")
@@ -159,11 +159,11 @@ def main():
         st.info("👆 예약 정보와 참여자 정보를 업로드해주세요")
 
     # Handle schedule generation
-    if st.session_state.get("generate_schedule", False):
-        st.session_state.generate_schedule = False  # Reset flag
+    if st.session_state.get("should_generate_schedule", False):
+        st.session_state.should_generate_schedule = False  # Reset flag
 
-        reservations = st.session_state.get("reservations", [])
-        users = st.session_state.get("users", [])
+        reservations = st.session_state.get("parsed_reservations_data", [])
+        users = st.session_state.get("parsed_users_data", [])
 
         if not reservations or not users:
             st.error("데이터를 먼저 업로드해주세요")
