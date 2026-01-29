@@ -7,6 +7,7 @@ from config import Config
 from src.parser import parse_reservations, parse_users
 from src.travel import NaverMapsClient
 from src.claude_agent import ClaudeScheduler, ScenarioDisplay
+from src.sheets import GoogleSheetsExporter, SheetsHelper
 
 
 def main():
@@ -31,12 +32,22 @@ def main():
         missing_config = Config.validate()
         if missing_config:
             st.error("❌ API 키가 설정되지 않았습니다")
-            st.markdown("다음 항목을 `.env` 파일에 설정해주세요:")
+            st.markdown("다음 항목을 `~/.zshrc`에 설정해주세요:")
             for item in missing_config:
                 st.code(item, language=None)
             st.stop()
         else:
             st.success("✅ API 키 설정 완료")
+
+        # Google Sheets status
+        st.divider()
+        st.subheader("📊 Google Sheets")
+        if Config.is_google_sheets_configured():
+            st.success("✅ 설정 완료")
+        else:
+            st.warning("⚠️ 미설정 (선택사항)")
+            with st.expander("설정 방법 보기"):
+                st.markdown(SheetsHelper.get_setup_instructions())
 
     # File upload section
     st.header("📁 1. 데이터 업로드")
@@ -157,20 +168,58 @@ def main():
             try:
                 st.header("🔄 4. 일정 생성 중...")
 
+                # Progress container
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+
                 # Step 1: Calculate travel times
-                with st.spinner("🗺️ 이동 시간 계산 중..."):
+                status_text.text("🗺️ 이동 시간 계산 중...")
+                progress_bar.progress(10)
+
+                try:
                     travel_client = NaverMapsClient()
                     addresses = list(set([r.address for r in reservations]))
-                    travel_matrix = travel_client.get_travel_time_matrix(addresses)
-                    st.success(f"✅ {len(addresses)}개 장소 간 이동 시간 계산 완료")
+
+                    # Progress callback for travel time calculation
+                    def update_progress(current, total):
+                        progress = 10 + int((current / total) * 40)
+                        progress_bar.progress(progress)
+                        status_text.text(
+                            f"🗺️ 이동 시간 계산 중... ({current}/{total})"
+                        )
+
+                    travel_matrix = travel_client.get_travel_time_matrix(
+                        addresses, progress_callback=update_progress
+                    )
+
+                    progress_bar.progress(50)
+                    status_text.text(f"✅ {len(addresses)}개 장소 간 이동 시간 계산 완료")
+
+                except Exception as e:
+                    st.error(f"❌ 이동 시간 계산 실패: {str(e)}")
+                    st.info(
+                        "💡 Naver Maps API 연결에 문제가 있을 수 있습니다. API 키를 확인해주세요."
+                    )
+                    raise
 
                 # Step 2: Generate scenarios with Claude
-                with st.spinner("🤖 Claude AI가 최적 시나리오를 생성하고 있습니다..."):
+                status_text.text("🤖 Claude AI가 최적 시나리오를 생성하고 있습니다...")
+                progress_bar.progress(60)
+
+                try:
                     claude = ClaudeScheduler()
                     scenarios = claude.generate_scenarios(
                         reservations, users, travel_matrix, num_scenarios=3
                     )
-                    st.success(f"✅ {len(scenarios)}개 시나리오 생성 완료")
+                    progress_bar.progress(100)
+                    status_text.text(f"✅ {len(scenarios)}개 시나리오 생성 완료")
+
+                except Exception as e:
+                    st.error(f"❌ 시나리오 생성 실패: {str(e)}")
+                    st.info(
+                        "💡 Claude API 연결에 문제가 있을 수 있습니다. API 키를 확인해주세요."
+                    )
+                    raise
 
                 # Step 3: Display scenarios
                 st.header("📋 5. 생성된 시나리오")
@@ -191,13 +240,35 @@ def main():
                             )
                             st.markdown(scenario_text)
 
-                            # Export button (placeholder for Phase 3)
-                            st.button(
+                            # Export button
+                            sheets_available = Config.is_google_sheets_configured()
+
+                            if st.button(
                                 "📊 Google Sheets로 내보내기",
                                 key=f"export_{scenario.get('scenario_id')}",
-                                disabled=True,
-                                help="Phase 3에서 구현 예정",
-                            )
+                                disabled=not sheets_available,
+                                help="Google Sheets로 일정표 내보내기"
+                                if sheets_available
+                                else "Google Sheets API를 먼저 설정해주세요 (사이드바 참고)",
+                            ):
+                                with st.spinner("📊 Google Sheets 생성 중..."):
+                                    try:
+                                        exporter = GoogleSheetsExporter()
+                                        sheet_url = exporter.create_schedule_sheet(
+                                            scenario
+                                        )
+
+                                        if sheet_url:
+                                            st.success("✅ Google Sheets 생성 완료!")
+                                            st.markdown(
+                                                f"[📊 시트 열기]({sheet_url})",
+                                                unsafe_allow_html=True,
+                                            )
+                                        else:
+                                            st.error("시트 생성에 실패했습니다")
+
+                                    except Exception as e:
+                                        st.error(f"Google Sheets 내보내기 오류: {str(e)}")
                 else:
                     st.warning("시나리오 생성에 실패했습니다")
 

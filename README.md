@@ -15,31 +15,32 @@
 
 ### 1. 환경 설정
 
-`.env` 파일을 생성하고 API 키를 설정하세요:
+**API 키를 `~/.zshrc`에 설정하세요:**
 
 ```bash
-cp .env.example .env
-```
-
-`.env` 파일 수정:
-```bash
-# Claude API
-CLAUDE_API_KEY=sk-ant-your-api-key-here
+# Claude API (Anthropic)
+export ANTHROPIC_API_KEY="sk-ant-your-api-key-here"
 
 # Naver Maps API
-NAVER_MAPS_CLIENT_ID=your-client-id-here
-NAVER_MAPS_CLIENT_SECRET=your-client-secret-here
-
-# Google Sheets API
-GOOGLE_SHEETS_CREDENTIALS_PATH=./credentials.json
+export NAVER_MAPS_CLIENT_ID="your-client-id-here"
+export NAVER_MAPS_CLIENT_SECRET="your-client-secret-here"
 ```
 
-### 2. Google Sheets 인증 설정
+환경 변수 적용:
+```bash
+source ~/.zshrc
+```
+
+### 2. Google Sheets 인증 설정 (선택사항)
+
+Google Sheets로 일정표를 내보내려면 추가 설정이 필요합니다:
 
 1. [Google Cloud Console](https://console.cloud.google.com/)에서 프로젝트 생성
-2. Google Sheets API 활성화
+2. Google Sheets API 및 Google Drive API 활성화
 3. 서비스 계정 생성 후 JSON 키 다운로드
-4. 다운로드한 파일을 `credentials.json`으로 저장
+4. 다운로드한 파일을 `credentials.json`으로 프로젝트 루트에 저장
+
+> **참고**: Google Sheets 설정 없이도 일정 생성 기능은 사용 가능합니다. 웹 UI에서 시나리오를 확인할 수 있습니다.
 
 ### 3. 서비스 시작
 
@@ -48,6 +49,21 @@ make build
 ```
 
 브라우저에서 http://localhost:8501 접속
+
+### 4. 사용 방법
+
+1. **CSV 파일 업로드**
+   - 예시 파일을 다운로드하거나 직접 작성
+   - 예약 정보와 참여자 정보를 업로드
+
+2. **일정 생성**
+   - "일정 생성하기" 버튼 클릭
+   - 이동 시간 계산 (Naver Maps API)
+   - Claude AI가 3가지 시나리오 생성
+
+3. **시나리오 선택 및 내보내기**
+   - 탭에서 시나리오 비교
+   - Google Sheets로 내보내기 (선택사항)
 
 ## 📁 CSV 파일 형식
 

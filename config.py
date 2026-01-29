@@ -44,7 +44,13 @@ class Config:
         if not cls.NAVER_MAPS_CLIENT_SECRET:
             missing.append("NAVER_MAPS_CLIENT_SECRET")
 
-        if not Path(cls.GOOGLE_SHEETS_CREDENTIALS_PATH).exists():
-            missing.append(f"Google Sheets credentials file at {cls.GOOGLE_SHEETS_CREDENTIALS_PATH}")
+        # Google Sheets is optional - don't block if not configured
+        # if not Path(cls.GOOGLE_SHEETS_CREDENTIALS_PATH).exists():
+        #     missing.append(f"Google Sheets credentials file at {cls.GOOGLE_SHEETS_CREDENTIALS_PATH}")
 
         return missing
+
+    @classmethod
+    def is_google_sheets_configured(cls) -> bool:
+        """Check if Google Sheets API is configured."""
+        return Path(cls.GOOGLE_SHEETS_CREDENTIALS_PATH).exists()

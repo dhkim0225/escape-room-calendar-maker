@@ -118,18 +118,21 @@ class NaverMapsClient:
             return None
 
     def get_travel_time_matrix(
-        self, addresses: list[str]
+        self, addresses: list[str], progress_callback=None
     ) -> dict[Tuple[str, str], int]:
         """
         Calculate travel times between all pairs of addresses.
 
         Args:
             addresses: List of addresses
+            progress_callback: Optional callback function(current, total) for progress updates
 
         Returns:
             Dictionary mapping (start_address, end_address) to travel time in minutes
         """
         matrix = {}
+        total_pairs = len(addresses) * (len(addresses) - 1)
+        current = 0
 
         for i, start in enumerate(addresses):
             for j, end in enumerate(addresses):
@@ -140,8 +143,42 @@ class NaverMapsClient:
                     if travel_time is not None:
                         matrix[(start, end)] = travel_time
                     else:
-                        # Fallback: estimate based on straight-line distance
-                        # This is a rough approximation
-                        matrix[(start, end)] = 30  # Default 30 minutes
+                        # Fallback: estimate based on location keywords
+                        matrix[(start, end)] = self._estimate_travel_time(
+                            start, end
+                        )
+
+                    current += 1
+                    if progress_callback:
+                        progress_callback(current, total_pairs)
 
         return matrix
+
+    @staticmethod
+    def _estimate_travel_time(start: str, end: str) -> int:
+        """
+        Estimate travel time based on address keywords (fallback).
+
+        Args:
+            start: Starting address
+            end: Destination address
+
+        Returns:
+            Estimated travel time in minutes
+        """
+        # Extract districts (구)
+        start_district = None
+        end_district = None
+
+        for district in ["강남구", "서초구", "송파구", "강동구", "마포구", "용산구", "성동구"]:
+            if district in start:
+                start_district = district
+            if district in end:
+                end_district = district
+
+        # Same district: 20-30 minutes
+        if start_district and start_district == end_district:
+            return 25
+
+        # Different districts: 30-60 minutes
+        return 45

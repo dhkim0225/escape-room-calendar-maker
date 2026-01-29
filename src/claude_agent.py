@@ -2,6 +2,7 @@
 Claude API integration for schedule generation.
 """
 import json
+import time
 from typing import List, Dict, Any
 from anthropic import Anthropic
 from config import Config
@@ -51,30 +52,47 @@ class ClaudeScheduler:
             reservations_text, users_text, travel_text, constraints_text, num_scenarios
         )
 
-        # Call Claude API
-        try:
-            response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=8000,
-                messages=[{"role": "user", "content": prompt}],
-            )
+        # Call Claude API with retry logic
+        max_retries = 3
+        retry_delay = 2  # seconds
 
-            # Parse response
-            # Get text from first content block
-            first_block = response.content[0]
-            if hasattr(first_block, "text"):
-                response_text = first_block.text
-            else:
-                raise ValueError("Unexpected response format from Claude")
+        for attempt in range(max_retries):
+            try:
+                response = self.client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=8000,
+                    messages=[{"role": "user", "content": prompt}],
+                )
 
-            # Extract JSON from response
-            scenarios = self._parse_scenarios(response_text)
+                # Parse response
+                # Get text from first content block
+                first_block = response.content[0]
+                if hasattr(first_block, "text"):
+                    response_text = first_block.text
+                else:
+                    raise ValueError("Unexpected response format from Claude")
 
-            return scenarios
+                # Extract JSON from response
+                scenarios = self._parse_scenarios(response_text)
 
-        except Exception as e:
-            print(f"Claude API error: {str(e)}")
-            raise
+                if scenarios:
+                    return scenarios
+                else:
+                    raise ValueError("No scenarios returned from Claude")
+
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    print(
+                        f"Claude API error (attempt {attempt + 1}/{max_retries}): {str(e)}"
+                    )
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    print(f"Claude API error (final attempt): {str(e)}")
+                    raise
+
+        # Should never reach here due to raise in except block
+        return []
 
     def _build_prompt(
         self,
@@ -187,34 +205,39 @@ class ScenarioDisplay:
         """
         lines = []
         lines.append(f"## {scenario['name']}")
-        lines.append(f"{scenario['description']}\n")
+        lines.append(f"*{scenario['description']}*\n")
 
         # Team summaries
         for team_id, assignments in scenario.get("teams", {}).items():
-            lines.append(f"### 팀 {team_id}")
+            lines.append(f"### 🎯 팀 {team_id}")
 
-            for assignment in assignments:
+            for i, assignment in enumerate(assignments, 1):
                 time_str = f"{assignment['start_time']}-{assignment['end_time']}"
                 members_str = ", ".join(assignment["members"])
+
+                # Theme emoji
+                theme_emoji = "🔪" if "공포" in assignment['theme'] else "🧩"
+
                 lines.append(
-                    f"- **{time_str}** | {assignment['room_name']} ({assignment['theme']})"
+                    f"**{i}. {time_str}** {theme_emoji} **{assignment['room_name']}** ({assignment['theme']})"
                 )
-                lines.append(f"  - 참여자 ({assignment['member_count']}명): {members_str}")
+                lines.append(f"   - 👥 참여자 ({assignment['member_count']}명): {members_str}")
 
                 if assignment.get("travel_time_from_previous", 0) > 0:
                     lines.append(
-                        f"  - 이동 시간: {assignment['travel_time_from_previous']}분"
+                        f"   - 🚗 이동 시간: {assignment['travel_time_from_previous']}분"
                     )
 
                 if assignment.get("notes"):
-                    lines.append(f"  - 메모: {assignment['notes']}")
+                    lines.append(f"   - 📝 {assignment['notes']}")
 
-            lines.append("")
+                lines.append("")
 
         # Pros and cons
-        lines.append("### 장점")
-        lines.append(scenario.get("pros", ""))
-        lines.append("\n### 단점")
-        lines.append(scenario.get("cons", ""))
+        lines.append("---")
+        lines.append("### ✅ 장점")
+        lines.append(scenario.get("pros", "없음"))
+        lines.append("\n### ⚠️ 단점")
+        lines.append(scenario.get("cons", "없음"))
 
         return "\n".join(lines)
