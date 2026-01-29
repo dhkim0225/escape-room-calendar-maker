@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Google credentials
+credentials.json
+token.json
+
+# Data files (keep examples, ignore actual data)
+data/*.csv
+!data/example_*.csv
+
+# Docker
+*.log
