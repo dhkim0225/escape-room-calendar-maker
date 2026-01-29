@@ -12,8 +12,8 @@ load_dotenv()
 class Config:
     """Application configuration."""
 
-    # Claude API
-    CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
+    # Claude API (Anthropic library uses ANTHROPIC_API_KEY by default)
+    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 
     # Naver Maps API
     NAVER_MAPS_CLIENT_ID = os.getenv("NAVER_MAPS_CLIENT_ID")
@@ -35,8 +35,8 @@ class Config:
         """
         missing = []
 
-        if not cls.CLAUDE_API_KEY:
-            missing.append("CLAUDE_API_KEY")
+        if not cls.ANTHROPIC_API_KEY:
+            missing.append("ANTHROPIC_API_KEY")
 
         if not cls.NAVER_MAPS_CLIENT_ID:
             missing.append("NAVER_MAPS_CLIENT_ID")
