@@ -5,6 +5,8 @@ import streamlit as st
 from pathlib import Path
 from config import Config
 from src.parser import parse_reservations, parse_users
+from src.travel import NaverMapsClient
+from src.claude_agent import ClaudeScheduler, ScenarioDisplay
 
 
 def main():
@@ -129,9 +131,10 @@ def main():
             st.header("🤖 3. 일정 생성")
 
             if st.button("🚀 일정 생성하기", type="primary", use_container_width=True):
-                with st.spinner("🤖 Claude AI가 일정을 생성하고 있습니다..."):
-                    # TODO: Implement scheduling logic
-                    st.info("⚠️ 일정 생성 기능은 아직 구현되지 않았습니다")
+                # Store data in session state for generation
+                st.session_state.reservations = reservations
+                st.session_state.users = users
+                st.session_state.generate_schedule = True
 
         except ValueError as e:
             st.error(f"❌ 데이터 파싱 오류: {str(e)}")
@@ -140,6 +143,69 @@ def main():
 
     else:
         st.info("👆 예약 정보와 참여자 정보를 업로드해주세요")
+
+    # Handle schedule generation
+    if st.session_state.get("generate_schedule", False):
+        st.session_state.generate_schedule = False  # Reset flag
+
+        reservations = st.session_state.get("reservations", [])
+        users = st.session_state.get("users", [])
+
+        if not reservations or not users:
+            st.error("데이터를 먼저 업로드해주세요")
+        else:
+            try:
+                st.header("🔄 4. 일정 생성 중...")
+
+                # Step 1: Calculate travel times
+                with st.spinner("🗺️ 이동 시간 계산 중..."):
+                    travel_client = NaverMapsClient()
+                    addresses = list(set([r.address for r in reservations]))
+                    travel_matrix = travel_client.get_travel_time_matrix(addresses)
+                    st.success(f"✅ {len(addresses)}개 장소 간 이동 시간 계산 완료")
+
+                # Step 2: Generate scenarios with Claude
+                with st.spinner("🤖 Claude AI가 최적 시나리오를 생성하고 있습니다..."):
+                    claude = ClaudeScheduler()
+                    scenarios = claude.generate_scenarios(
+                        reservations, users, travel_matrix, num_scenarios=3
+                    )
+                    st.success(f"✅ {len(scenarios)}개 시나리오 생성 완료")
+
+                # Step 3: Display scenarios
+                st.header("📋 5. 생성된 시나리오")
+
+                if scenarios:
+                    # Create tabs for each scenario
+                    tab_names = [
+                        f"{s.get('name', f'시나리오 {i+1}')}"
+                        for i, s in enumerate(scenarios)
+                    ]
+                    tabs = st.tabs(tab_names)
+
+                    for tab, scenario in zip(tabs, scenarios):
+                        with tab:
+                            # Display scenario
+                            scenario_text = ScenarioDisplay.format_scenario_summary(
+                                scenario
+                            )
+                            st.markdown(scenario_text)
+
+                            # Export button (placeholder for Phase 3)
+                            st.button(
+                                "📊 Google Sheets로 내보내기",
+                                key=f"export_{scenario.get('scenario_id')}",
+                                disabled=True,
+                                help="Phase 3에서 구현 예정",
+                            )
+                else:
+                    st.warning("시나리오 생성에 실패했습니다")
+
+            except Exception as e:
+                st.error(f"❌ 일정 생성 오류: {str(e)}")
+                import traceback
+
+                st.code(traceback.format_exc())
 
 
 if __name__ == "__main__":
