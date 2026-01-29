@@ -74,14 +74,23 @@ class GoogleSheetsExporter:
             return spreadsheet.url
 
         except Exception as e:
+            import traceback
             error_msg = str(e)
+            error_trace = traceback.format_exc()
             print(f"Failed to create Google Sheet: {error_msg}")
+            print(f"Full traceback:\n{error_trace}")
 
             # Check for specific errors
             if "storageQuotaExceeded" in error_msg or "storage quota" in error_msg.lower():
-                raise ValueError("❌ Google Drive 저장 용량이 초과되었습니다. Drive에서 파일을 삭제하거나 용량을 늘려주세요.")
+                # This is actually a Service Account limitation
+                raise ValueError(
+                    "❌ Service Account로 생성된 시트는 공유 드라이브에 저장됩니다.\n"
+                    "해결 방법:\n"
+                    "1. Service Account 이메일을 Google Drive에서 찾아 파일 삭제\n"
+                    "2. 또는 '📥 CSV 다운로드' 버튼을 사용하세요"
+                )
             elif "403" in error_msg:
-                raise ValueError("❌ Google Sheets 권한이 없습니다. Service Account에 Editor 권한이 있는지 확인해주세요.")
+                raise ValueError(f"❌ Google Sheets API 권한 오류: {error_msg}")
             else:
                 raise ValueError(f"❌ Google Sheets 생성 실패: {error_msg}")
 
