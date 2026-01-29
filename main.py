@@ -111,7 +111,7 @@ def main():
 
             # Display and edit data
             st.header("📊 2. 데이터 확인 및 편집")
-            st.info("💡 표를 직접 클릭해서 수정할 수 있습니다. 행 추가/삭제도 가능합니다.")
+            st.info("💡 표를 직접 클릭해서 수정할 수 있습니다. 날짜/시간 컬럼을 클릭하면 선택창이 열립니다. 하단 ➕ 버튼으로 행 추가, 행 선택 후 🗑️ 버튼으로 삭제할 수 있습니다.")
 
             tab1, tab2 = st.tabs(["예약 정보", "참여자 정보"])
 
@@ -120,8 +120,8 @@ def main():
                 reservations_df = pd.DataFrame([
                     {
                         "방이름": r.room_name,
-                        "시작시간": r.start_time.strftime("%Y-%m-%d %H:%M"),
-                        "종료시간": r.end_time.strftime("%Y-%m-%d %H:%M"),
+                        "시작시간": r.start_time,
+                        "종료시간": r.end_time,
                         "주소": r.address,
                         "테마": r.theme,
                         "최소인원": r.min_capacity,
@@ -138,8 +138,18 @@ def main():
                     key="reservations_editor",
                     column_config={
                         "방이름": st.column_config.TextColumn("방이름", required=True),
-                        "시작시간": st.column_config.TextColumn("시작시간 (YYYY-MM-DD HH:MM)", required=True),
-                        "종료시간": st.column_config.TextColumn("종료시간 (YYYY-MM-DD HH:MM)", required=True),
+                        "시작시간": st.column_config.DatetimeColumn(
+                            "시작시간",
+                            required=True,
+                            format="YYYY-MM-DD HH:mm",
+                            help="날짜와 시간을 선택하세요"
+                        ),
+                        "종료시간": st.column_config.DatetimeColumn(
+                            "종료시간",
+                            required=True,
+                            format="YYYY-MM-DD HH:mm",
+                            help="날짜와 시간을 선택하세요"
+                        ),
                         "주소": st.column_config.TextColumn("주소", required=True),
                         "테마": st.column_config.TextColumn("테마", required=True),
                         "최소인원": st.column_config.NumberColumn("최소인원", min_value=1, max_value=20, required=True),
@@ -156,8 +166,8 @@ def main():
                 users_df = pd.DataFrame([
                     {
                         "이름": u.name,
-                        "참여시작시간": u.available_from.strftime("%Y-%m-%d %H:%M"),
-                        "참여종료시간": u.available_until.strftime("%Y-%m-%d %H:%M"),
+                        "참여시작시간": u.available_from,
+                        "참여종료시간": u.available_until,
                         "공포포지션": u.horror_position
                     }
                     for u in users
@@ -170,8 +180,18 @@ def main():
                     key="users_editor",
                     column_config={
                         "이름": st.column_config.TextColumn("이름", required=True),
-                        "참여시작시간": st.column_config.TextColumn("참여시작시간 (YYYY-MM-DD HH:MM)", required=True),
-                        "참여종료시간": st.column_config.TextColumn("참여종료시간 (YYYY-MM-DD HH:MM)", required=True),
+                        "참여시작시간": st.column_config.DatetimeColumn(
+                            "참여시작시간",
+                            required=True,
+                            format="YYYY-MM-DD HH:mm",
+                            help="날짜와 시간을 선택하세요"
+                        ),
+                        "참여종료시간": st.column_config.DatetimeColumn(
+                            "참여종료시간",
+                            required=True,
+                            format="YYYY-MM-DD HH:mm",
+                            help="날짜와 시간을 선택하세요"
+                        ),
                         "공포포지션": st.column_config.SelectboxColumn(
                             "공포포지션",
                             options=["탱커", "평민", "쫄"],
@@ -191,13 +211,26 @@ def main():
                 try:
                     from io import StringIO
 
+                    # Convert datetime columns to string format for CSV parsing
+                    reservations_csv_df = edited_reservations_df.copy()
+                    if "시작시간" in reservations_csv_df.columns:
+                        reservations_csv_df["시작시간"] = pd.to_datetime(reservations_csv_df["시작시간"]).dt.strftime("%Y-%m-%d %H:%M")
+                    if "종료시간" in reservations_csv_df.columns:
+                        reservations_csv_df["종료시간"] = pd.to_datetime(reservations_csv_df["종료시간"]).dt.strftime("%Y-%m-%d %H:%M")
+
+                    users_csv_df = edited_users_df.copy()
+                    if "참여시작시간" in users_csv_df.columns:
+                        users_csv_df["참여시작시간"] = pd.to_datetime(users_csv_df["참여시작시간"]).dt.strftime("%Y-%m-%d %H:%M")
+                    if "참여종료시간" in users_csv_df.columns:
+                        users_csv_df["참여종료시간"] = pd.to_datetime(users_csv_df["참여종료시간"]).dt.strftime("%Y-%m-%d %H:%M")
+
                     # Convert edited DataFrames back to CSV format for parsing
                     reservations_csv = StringIO()
-                    edited_reservations_df.to_csv(reservations_csv, index=False)
+                    reservations_csv_df.to_csv(reservations_csv, index=False)
                     reservations_csv.seek(0)
 
                     users_csv = StringIO()
-                    edited_users_df.to_csv(users_csv, index=False)
+                    users_csv_df.to_csv(users_csv, index=False)
                     users_csv.seek(0)
 
                     # Parse edited data
@@ -280,6 +313,9 @@ def main():
                     progress_bar.progress(100)
                     status_text.text(f"✅ {len(scenarios)}개 시나리오 생성 완료")
 
+                    # Store scenarios in session state to persist across reruns
+                    st.session_state.generated_scenarios = scenarios
+
                 except Exception as e:
                     st.error(f"❌ 시나리오 생성 실패: {str(e)}")
                     st.info(
@@ -287,10 +323,27 @@ def main():
                     )
                     raise
 
-                # Step 3: Display scenarios
-                st.header("📋 5. 생성된 시나리오")
+            except Exception as e:
+                st.error(f"❌ 일정 생성 오류: {str(e)}")
+                import traceback
 
-                if scenarios:
+                st.code(traceback.format_exc())
+
+    # Display scenarios if they exist in session state
+    if st.session_state.get("generated_scenarios"):
+        scenarios = st.session_state.generated_scenarios
+
+        # Header with clear button
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.header("📋 생성된 시나리오")
+        with col2:
+            st.write("")  # Spacing
+            if st.button("🗑️ 일정 초기화", use_container_width=True, help="생성된 일정을 삭제하고 처음부터 다시 시작합니다"):
+                st.session_state.generated_scenarios = None
+                st.rerun()
+
+        if scenarios:
                     # Create tabs for each scenario
                     tab_names = [
                         f"{s.get('name', f'시나리오 {i+1}')}"
@@ -306,45 +359,110 @@ def main():
                             )
                             st.markdown(scenario_text)
 
-                            # Export buttons
-                            col1, col2 = st.columns(2)
+                            # Export section
+                            st.divider()
+                            st.subheader("📤 내보내기")
 
-                            with col1:
-                                sheets_available = Config.is_google_sheets_configured()
+                            # Google Sheets export with URL input
+                            sheets_available = Config.is_google_sheets_configured()
 
-                                if st.button(
-                                    "📊 Google Sheets로 내보내기",
-                                    key=f"export_sheets_{scenario.get('scenario_id')}",
-                                    disabled=not sheets_available,
-                                    help="Google Sheets로 일정표 내보내기"
-                                    if sheets_available
-                                    else "Google Sheets API를 먼저 설정해주세요 (사이드바 참고)",
-                                    use_container_width=True,
-                                ):
-                                    with st.spinner("📊 Google Sheets 생성 중..."):
-                                        try:
-                                            exporter = GoogleSheetsExporter()
-                                            sheet_url = exporter.create_schedule_sheet(
-                                                scenario
-                                            )
+                            if sheets_available:
+                                st.markdown("**📊 Google Sheets로 내보내기**")
+                                # Get Service Account email
+                                try:
+                                    from src.sheets import GoogleSheetsExporter
+                                    exporter_temp = GoogleSheetsExporter()
+                                    if exporter_temp.enabled:
+                                        service_email = exporter_temp.client.auth.service_account_email
+                                    else:
+                                        service_email = "N/A"
+                                except:
+                                    service_email = "N/A"
 
-                                            if sheet_url:
-                                                st.success("✅ Google Sheets 생성 완료!")
-                                                st.markdown(
-                                                    f"[📊 시트 열기]({sheet_url})",
-                                                    unsafe_allow_html=True,
+                                st.info(
+                                    f"💡 **사용 방법:**\n"
+                                    f"1. 본인 Google Sheets를 열고 '공유' 클릭\n"
+                                    f"2. 다음 이메일 추가 (편집자 권한): `{service_email}`\n"
+                                    f"3. 스프레드시트 URL을 아래에 붙여넣기\n"
+                                    f"4. '시트에 탭 추가' 버튼 클릭\n\n"
+                                    f"✨ Service Account 용량 제한 없음!"
+                                )
+
+                                spreadsheet_url = st.text_input(
+                                    "스프레드시트 URL",
+                                    key=f"spreadsheet_url_{scenario.get('scenario_id')}",
+                                    placeholder="https://docs.google.com/spreadsheets/d/...",
+                                    help="본인이 소유한 Google Sheets URL을 입력하세요"
+                                )
+
+                                col1, col2 = st.columns(2)
+
+                                with col1:
+                                    if st.button(
+                                        "📊 시트에 탭 추가",
+                                        key=f"export_sheets_{scenario.get('scenario_id')}",
+                                        disabled=not spreadsheet_url,
+                                        use_container_width=True,
+                                    ):
+                                        with st.spinner("📊 시트 탭 추가 중..."):
+                                            try:
+                                                exporter = GoogleSheetsExporter()
+                                                sheet_url = exporter.add_sheet_to_existing_spreadsheet(
+                                                    spreadsheet_url, scenario
                                                 )
-                                            else:
-                                                st.error("시트 생성에 실패했습니다")
 
-                                        except Exception as e:
-                                            st.error(f"{str(e)}")
+                                                if sheet_url:
+                                                    st.success("✅ 시트 탭 추가 완료!")
+                                                    st.markdown(
+                                                        f"[📊 시트 열기]({sheet_url})",
+                                                        unsafe_allow_html=True,
+                                                    )
+                                                else:
+                                                    st.error("시트 추가에 실패했습니다")
 
-                            with col2:
-                                # CSV download button
+                                            except Exception as e:
+                                                st.error(f"{str(e)}")
+
+                                with col2:
+                                    # CSV download button (moved inside col2)
+                                    st.markdown("**📥 CSV 다운로드**")
+                                    import pandas as pd
+
+                                    # Convert scenario to CSV format
+                                    rows = []
+                                    for team_id, assignments in scenario.get("teams", {}).items():
+                                        for assignment in assignments:
+                                            rows.append({
+                                                "팀": f"팀 {team_id}",
+                                                "시작시간": assignment.get("start_time", ""),
+                                                "종료시간": assignment.get("end_time", ""),
+                                                "방이름": assignment.get("room_name", ""),
+                                                "테마": assignment.get("theme", ""),
+                                                "참여자": ", ".join(assignment.get("members", [])),
+                                                "인원": assignment.get("member_count", 0),
+                                                "이동시간(분)": assignment.get("travel_time_from_previous", 0),
+                                                "메모": assignment.get("notes", "")
+                                            })
+
+                                    if rows:
+                                        csv_df = pd.DataFrame(rows)
+                                        csv_data = csv_df.to_csv(index=False, encoding="utf-8-sig")
+
+                                        st.download_button(
+                                            label="다운로드",
+                                            data=csv_data,
+                                            file_name=f"escape_room_schedule_{scenario.get('scenario_id', 1)}.csv",
+                                            mime="text/csv",
+                                            key=f"export_csv_{scenario.get('scenario_id')}",
+                                            use_container_width=True,
+                                        )
+                            else:
+                                st.warning("⚠️ Google Sheets API가 설정되지 않았습니다. (사이드바 참고)")
+
+                                # CSV download only
+                                st.markdown("**📥 CSV 다운로드**")
                                 import pandas as pd
 
-                                # Convert scenario to CSV format
                                 rows = []
                                 for team_id, assignments in scenario.get("teams", {}).items():
                                     for assignment in assignments:
@@ -369,17 +487,11 @@ def main():
                                         data=csv_data,
                                         file_name=f"escape_room_schedule_{scenario.get('scenario_id', 1)}.csv",
                                         mime="text/csv",
-                                        key=f"export_csv_{scenario.get('scenario_id')}",
+                                        key=f"export_csv_only_{scenario.get('scenario_id')}",
                                         use_container_width=True,
                                     )
-                else:
-                    st.warning("시나리오 생성에 실패했습니다")
-
-            except Exception as e:
-                st.error(f"❌ 일정 생성 오류: {str(e)}")
-                import traceback
-
-                st.code(traceback.format_exc())
+        else:
+            st.info("일정을 생성하면 여기에 시나리오가 표시됩니다.")
 
 
 if __name__ == "__main__":

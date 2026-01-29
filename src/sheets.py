@@ -29,18 +29,19 @@ class GoogleSheetsExporter:
             self.enabled = False
             self.client = None
 
-    def create_schedule_sheet(
-        self, scenario: Dict[str, Any], title: Optional[str] = None
+    def add_sheet_to_existing_spreadsheet(
+        self, spreadsheet_url: str, scenario: Dict[str, Any], sheet_title: Optional[str] = None
     ) -> Optional[str]:
         """
-        Create a new Google Sheet with the schedule.
+        Add a new sheet (tab) to an existing spreadsheet.
 
         Args:
+            spreadsheet_url: URL of the target spreadsheet
             scenario: Scenario dictionary from Claude
-            title: Optional custom title for the sheet
+            sheet_title: Optional title for the new sheet
 
         Returns:
-            URL of the created sheet, or None if failed
+            URL of the spreadsheet with new sheet, or None if failed
         """
         if not self.enabled:
             raise ValueError(
@@ -48,16 +49,57 @@ class GoogleSheetsExporter:
             )
 
         try:
-            # Create spreadsheet
-            if not title:
+            # Extract spreadsheet ID from URL
+            import re
+            match = re.search(r'/spreadsheets/d/([a-zA-Z0-9-_]+)', spreadsheet_url)
+            if not match:
+                raise ValueError("❌ 올바른 Google Sheets URL이 아닙니다. URL 형식: https://docs.google.com/spreadsheets/d/...")
+
+            spreadsheet_id = match.group(1)
+
+            # Open existing spreadsheet
+            try:
+                spreadsheet = self.client.open_by_key(spreadsheet_id)
+            except PermissionError:
+                raise ValueError(
+                    f"❌ 스프레드시트 접근 권한이 없습니다.\n\n"
+                    f"해결 방법:\n"
+                    f"1. 스프레드시트를 열고 '공유' 버튼 클릭\n"
+                    f"2. Service Account 이메일 추가: {self.client.auth.service_account_email}\n"
+                    f"3. 권한을 '편집자'로 설정\n\n"
+                    f"또는 '링크가 있는 모든 사용자'로 설정하고 '편집자' 권한 부여"
+                )
+            except Exception as e:
+                error_msg = str(e)
+                if "403" in error_msg or "permission" in error_msg.lower():
+                    raise ValueError(
+                        f"❌ 스프레드시트 접근 권한이 없습니다.\n\n"
+                        f"해결 방법:\n"
+                        f"1. 스프레드시트를 열고 '공유' 버튼 클릭\n"
+                        f"2. Service Account 이메일 추가: {self.client.auth.service_account_email}\n"
+                        f"3. 권한을 '편집자'로 설정\n\n"
+                        f"또는 '링크가 있는 모든 사용자'로 설정하고 '편집자' 권한 부여"
+                    )
+                else:
+                    raise ValueError(f"❌ 스프레드시트를 열 수 없습니다: {error_msg if error_msg else type(e).__name__}")
+
+            # Create sheet title
+            if not sheet_title:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                title = f"방탈출 일정 - {scenario.get('name', '시나리오')} - {timestamp}"
+                sheet_title = f"{scenario.get('name', '시나리오')} - {timestamp}"
 
-            spreadsheet = self.client.create(title)
+            # Add new worksheet
+            try:
+                worksheet = spreadsheet.add_worksheet(title=sheet_title, rows=100, cols=20)
+            except Exception as e:
+                if "already exists" in str(e).lower():
+                    # Sheet with same name exists, add number suffix
+                    import random
+                    sheet_title = f"{sheet_title}_{random.randint(1000, 9999)}"
+                    worksheet = spreadsheet.add_worksheet(title=sheet_title, rows=100, cols=20)
+                else:
+                    raise
 
-            # Get the first worksheet
-            worksheet = spreadsheet.sheet1
-            worksheet.update_title("타임라인")
 
             # Format the schedule
             data = self._format_timeline(scenario)
@@ -68,10 +110,7 @@ class GoogleSheetsExporter:
             # Apply formatting
             self._apply_formatting(worksheet, len(data), len(data[0]) if data else 0)
 
-            # Share with anyone (view only)
-            spreadsheet.share(None, perm_type="anyone", role="reader")
-
-            return spreadsheet.url
+            return f"{spreadsheet.url}#gid={worksheet.id}"
 
         except Exception as e:
             import traceback
