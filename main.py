@@ -62,7 +62,7 @@ def main():
         reservations_file = st.file_uploader(
             "예약 CSV 파일을 업로드하세요",
             type=["csv"],
-            key="reservations",
+            key="reservations_file",
             help="방이름, 시작시간, 종료시간, 주소, 테마, 최소인원, 적정인원, 최대인원 컬럼이 필요합니다"
         )
 
@@ -82,7 +82,7 @@ def main():
         users_file = st.file_uploader(
             "참여자 CSV 파일을 업로드하세요",
             type=["csv"],
-            key="users",
+            key="users_file",
             help="이름, 참여시작시간, 참여종료시간, 공포포지션 컬럼이 필요합니다"
         )
 
