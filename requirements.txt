@@ -6,7 +6,7 @@ pandas==2.2.0
 python-dateutil==2.8.2
 
 # API clients
-anthropic==0.18.1
+anthropic>=0.40.0
 gspread==6.0.2
 google-auth==2.27.0
 google-auth-oauthlib==1.2.0
